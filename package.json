@@ -1,7 +1,7 @@
 {
   "name": "systemd-timers",
   "version": "0.0.1",
-  "description": "Hi",
+  "description": "Validate, generate, describe and convert cron expressions to systemd timers",
   "author": "Hương Đá Group",
   "license": "ISC",
   "main": "./dist/index.js",
