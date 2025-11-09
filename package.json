@@ -1,0 +1,32 @@
+{
+  "name": "systemd-timers",
+  "version": "0.0.1",
+  "description": "Hi",
+  "author": "Hương Đá Group",
+  "license": "ISC",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.js",
+  "bugs": {
+    "url": "https://github.com/huongda-group/systemd-timers/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "module": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "build": "bunx tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huongda-group/systemd-timers.git"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "vitest": "^4.0.8"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
