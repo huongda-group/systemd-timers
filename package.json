@@ -15,7 +15,7 @@
   "module": "src/index.ts",
   "type": "module",
   "scripts": {
-    "test": "vitest run",
+    "test": "bun test",
     "build": "bunx tsc"
   },
   "repository": {
