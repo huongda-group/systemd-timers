@@ -86,7 +86,7 @@ const SECOND_FIELD: FieldConfig = {
   allowWildcard: true,
   allowFraction: true,
   min: 0,
-  max: 60,
+  max: 59,
 };
 
 export default function validateSystemdCalendarSpec(input: string): boolean {
@@ -179,63 +179,69 @@ function validateExpression(expression: string): boolean {
     return false;
   }
 
-  let tokens = rest.split(/\s+/).filter(Boolean);
+  const tokens = rest.split(/\s+/).filter(Boolean);
   if (!tokens.length) {
     return Boolean(daySpec);
   }
 
-  let trailingTimezone: string | undefined;
-  if (tokens.length) {
-    const lastToken = tokens[tokens.length - 1];
-    if (lastToken && isValidTimeZoneLiteral(lastToken)) {
-      trailingTimezone = lastToken;
-      tokens = tokens.slice(0, -1);
-    }
-  }
-
-  if (tzDirective && trailingTimezone) {
-    return false;
-  }
-
+  let dateToken: string | undefined;
   let timeToken: string | undefined;
-  let timeIndex = -1;
+  let timezoneToken: string | undefined;
+  let timezoneIndex = -1;
+
   for (let i = 0; i < tokens.length; i += 1) {
-    const candidate = tokens[i];
-    if (!candidate) {
+    const token = tokens[i];
+    if (!token) {
+      return false;
+    }
+
+    if (!dateToken && !timeToken && isValidDateSpec(token)) {
+      dateToken = token;
       continue;
     }
-    if (candidate.includes(":")) {
-      if (timeToken) {
-        return false;
-      }
-      timeToken = candidate;
-      timeIndex = i;
-    }
-  }
 
-  if (timeToken) {
-    if (!isValidTimeSpec(timeToken)) {
-      return false;
+    if (!timeToken && token.includes(":")) {
+      timeToken = token;
+      continue;
     }
-    if (timeIndex >= 0) {
-      tokens.splice(timeIndex, 1);
-    }
-  }
 
-  if (tokens.length > 1) {
+    if (!timezoneToken && isValidTimeZoneLiteral(token)) {
+      timezoneToken = token;
+      timezoneIndex = i;
+      continue;
+    }
+
     return false;
   }
 
-  let hasDate = false;
-  if (tokens.length === 1) {
-    const dateToken = tokens[0];
-    if (!dateToken || !isValidDateSpec(dateToken)) {
+  if (timezoneToken) {
+    if (tzDirective) {
       return false;
     }
-    hasDate = true;
+    if (!timeToken) {
+      return false;
+    }
+    if (timezoneIndex !== tokens.length - 1) {
+      return false;
+    }
   }
 
-  if (!daySpec && !timeToken && !hasDate) {
+  if (dateToken && !timeToken) {
+    return false;
+  }
+
+  const isTimeOnly =
+    Boolean(timeToken) &&
+    !daySpec &&
+    !dateToken &&
+    !timezoneToken &&
+    !tzDirective;
+
+  if (timeToken && !isValidTimeSpec(timeToken, { timeOnly: isTimeOnly })) {
+    return false;
+  }
+
+  if (!timeToken && !daySpec) {
     return false;
   }
 
@@ -507,8 +513,34 @@ function isValidValue(value: string, config: FieldConfig): boolean {
   return true;
 }
 
-function isValidTimeSpec(token: string): boolean {
-  const parts = token.split(":");
+type TimeValidationOptions = {
+  timeOnly: boolean;
+};
+
+function isValidTimeSpec(
+  token: string,
+  options: TimeValidationOptions
+): boolean {
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  const commaParts = splitCommaParts(trimmed);
+  const treatAsList =
+    commaParts.length > 1 && commaParts.every((part) => part.includes(":"));
+
+  if (treatAsList) {
+    return commaParts.every((part) =>
+      isValidTimeAtom(part.trim(), options)
+    );
+  }
+
+  return isValidTimeAtom(trimmed, options);
+}
+
+function isValidTimeAtom(atom: string, options: TimeValidationOptions): boolean {
+  const parts = atom.split(":");
   if (parts.length < 2 || parts.length > 3) {
     return false;
   }
@@ -533,6 +565,14 @@ function isValidTimeSpec(token: string): boolean {
       return false;
     }
     return validateField(secondSpec, SECOND_FIELD);
+  }
+
+  if (containsFlexibleMinute(minuteSpec)) {
+    return false;
+  }
+
+  if (options.timeOnly && !isZeroMinuteList(minuteSpec)) {
+    return false;
   }
 
   return true;
@@ -596,6 +636,25 @@ function isValidTimeSpan(value: string): boolean {
 
   TIME_SPAN_SEGMENT.lastIndex = 0;
   return true;
+}
+
+function splitCommaParts(value: string): string[] {
+  return value
+    .split(",")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+function containsFlexibleMinute(value: string): boolean {
+  return /[*~/]/.test(value) || value.includes("..");
+}
+
+function isZeroMinuteList(value: string): boolean {
+  const parts = splitCommaParts(value);
+  if (!parts.length) {
+    return false;
+  }
+  return parts.every((part) => /^\d+$/.test(part) && Number(part) === 0);
 }
 
 function splitExpressions(input: string): string[] {
